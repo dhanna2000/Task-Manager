@@ -1,13 +1,16 @@
 /**
  * Quest Board bot — entry point.
- * One slash command for setup; everything else is buttons + modals.
+ * Slash: setup + list-quests + list-archived + create-quest; rest is buttons + modals.
  */
 
 require('dotenv').config();
 const { Client, Events, GatewayIntentBits } = require('discord.js');
 const setup = require('./commands/setup-quests');
+const listQuests = require('./commands/list-quests');
+const listArchived = require('./commands/list-archived');
+const createQuest = require('./commands/create-quest');
 const { handleButton } = require('./interactions/handleButtons');
-const { handleUserSelect, handleModalSubmit } = require('./interactions/handleModals');
+const { handleModalSubmit } = require('./interactions/handleModals');
 
 const token = process.env.DISCORD_TOKEN;
 
@@ -19,7 +22,7 @@ if (!token) {
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    /** Member list for user select + assignee checks */
+    /** Member list for assignee checks */
     GatewayIntentBits.GuildMembers,
   ],
 });
@@ -30,21 +33,28 @@ client.once(Events.ClientReady, (c) => {
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
+    if (interaction.isAutocomplete()) {
+      if (interaction.commandName === createQuest.data.name) {
+        await createQuest.autocomplete(interaction);
+      }
+      return;
+    }
+
     if (interaction.isChatInputCommand()) {
       if (interaction.commandName === setup.data.name) {
         await setup.execute(interaction);
+      } else if (interaction.commandName === listQuests.data.name) {
+        await listQuests.execute(interaction);
+      } else if (interaction.commandName === listArchived.data.name) {
+        await listArchived.execute(interaction);
+      } else if (interaction.commandName === createQuest.data.name) {
+        await createQuest.execute(interaction);
       }
       return;
     }
 
     if (interaction.isButton()) {
       const handled = await handleButton(interaction);
-      if (handled === false) return;
-      return;
-    }
-
-    if (interaction.isUserSelectMenu()) {
-      const handled = await handleUserSelect(interaction);
       if (handled === false) return;
       return;
     }

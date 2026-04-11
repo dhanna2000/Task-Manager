@@ -3,16 +3,73 @@ const {
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
-  UserSelectMenuBuilder,
 } = require('discord.js');
 const db = require('../storage/database');
-const { MODAL, FIELDS, BOARD } = require('../utils/ids');
-const { remember, take } = require('./pendingAssignment');
+const { MODAL, FIELDS } = require('../utils/ids');
+const { parseDiscordUserId } = require('../utils/parseAssignee');
+const questDraft = require('./questDraft');
 const { STATUS, buildQuestEmbed, questComponents } = require('../utils/embeds');
+const { parseSubtasksFromText } = require('../utils/subtasks');
 
+/** Board button: full form (no slash dropdowns available). */
 function buildCreateQuestModal() {
+  const modal = new ModalBuilder().setCustomId(MODAL.CREATE).setTitle('New Quest');
+
+  const titleInput = new TextInputBuilder()
+    .setCustomId(FIELDS.TITLE)
+    .setLabel('Quest Title')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(100)
+    .setPlaceholder('e.g. Build a windmill near spawn');
+
+  const descInput = new TextInputBuilder()
+    .setCustomId(FIELDS.DESCRIPTION)
+    .setLabel('Description / Notes (optional)')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(false)
+    .setMaxLength(500)
+    .setPlaceholder('Extra cozy details for your fellow adventurers…');
+
+  const assigneeInput = new TextInputBuilder()
+    .setCustomId(FIELDS.ASSIGNEE)
+    .setLabel('Assignee (@mention or user ID)')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(100)
+    .setPlaceholder('@Steve or paste their user ID');
+
+  const categoryInput = new TextInputBuilder()
+    .setCustomId(FIELDS.CATEGORY)
+    .setLabel('Category')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(50)
+    .setPlaceholder('Mining, Build, Farming — or a new name');
+
+  const subtasksInput = new TextInputBuilder()
+    .setCustomId(FIELDS.SUBTASKS)
+    .setLabel('Subtasks (optional — one per line)')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(false)
+    .setMaxLength(2000)
+    .setPlaceholder('Gather oak logs\nBuild the frame\nAdd the roof');
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(titleInput),
+    new ActionRowBuilder().addComponents(descInput),
+    new ActionRowBuilder().addComponents(assigneeInput),
+    new ActionRowBuilder().addComponents(categoryInput),
+    new ActionRowBuilder().addComponents(subtasksInput)
+  );
+
+  return modal;
+}
+
+/** After `/create-quest` with assignee + category already chosen. */
+function buildCreateQuestModalSlash() {
   const modal = new ModalBuilder()
-    .setCustomId(MODAL.CREATE)
+    .setCustomId(MODAL.CREATE_SLASH)
     .setTitle('New Quest');
 
   const titleInput = new TextInputBuilder()
@@ -31,129 +88,119 @@ function buildCreateQuestModal() {
     .setMaxLength(500)
     .setPlaceholder('Extra cozy details for your fellow adventurers…');
 
-  const catInput = new TextInputBuilder()
-    .setCustomId(FIELDS.CATEGORY)
-    .setLabel('Category (optional)')
-    .setStyle(TextInputStyle.Short)
+  const subtasksInput = new TextInputBuilder()
+    .setCustomId(FIELDS.SUBTASKS)
+    .setLabel('Subtasks (optional — one per line)')
+    .setStyle(TextInputStyle.Paragraph)
     .setRequired(false)
-    .setMaxLength(50)
-    .setPlaceholder('Build, Mining, Decoration, Create Mod…');
+    .setMaxLength(2000)
+    .setPlaceholder('Step one\nStep two');
 
   modal.addComponents(
     new ActionRowBuilder().addComponents(titleInput),
     new ActionRowBuilder().addComponents(descInput),
-    new ActionRowBuilder().addComponents(catInput)
+    new ActionRowBuilder().addComponents(subtasksInput)
   );
-
   return modal;
 }
 
-/** Ephemeral reply with native user picker (after “Create Quest” button). */
-function showAssigneePicker(interaction) {
-  const select = new UserSelectMenuBuilder()
-    .setCustomId(BOARD.PICK_ADVENTURER)
-    .setPlaceholder('Choose an adventurer for this quest')
-    .setMinValues(1)
-    .setMaxValues(1);
+function buildCreateQuestModalSlashOther() {
+  const modal = new ModalBuilder()
+    .setCustomId(MODAL.CREATE_SLASH_OTHER)
+    .setTitle('New Quest (custom category)');
 
-  return interaction.reply({
-    ephemeral: true,
-    content:
-      '**Who’s taking this quest?** Pick someone from the list — then you’ll get the little form to name it.',
-    components: [new ActionRowBuilder().addComponents(select)],
-  });
+  const titleInput = new TextInputBuilder()
+    .setCustomId(FIELDS.TITLE)
+    .setLabel('Quest Title')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(100)
+    .setPlaceholder('e.g. Build a windmill near spawn');
+
+  const descInput = new TextInputBuilder()
+    .setCustomId(FIELDS.DESCRIPTION)
+    .setLabel('Description / Notes (optional)')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(false)
+    .setMaxLength(500)
+    .setPlaceholder('Extra cozy details for your fellow adventurers…');
+
+  const catInput = new TextInputBuilder()
+    .setCustomId(FIELDS.CATEGORY_CUSTOM)
+    .setLabel('Category name')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(50)
+    .setPlaceholder('e.g. Redstone, Lore, PvP');
+
+  const subtasksInput = new TextInputBuilder()
+    .setCustomId(FIELDS.SUBTASKS)
+    .setLabel('Subtasks (optional — one per line)')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(false)
+    .setMaxLength(2000)
+    .setPlaceholder('Step one\nStep two');
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(titleInput),
+    new ActionRowBuilder().addComponents(descInput),
+    new ActionRowBuilder().addComponents(catInput),
+    new ActionRowBuilder().addComponents(subtasksInput)
+  );
+  return modal;
 }
 
-async function openCreateQuestModal(interaction) {
-  await interaction.showModal(buildCreateQuestModal());
-}
-
-/**
- * User picked an adventurer from the dropdown — remember ID, then open the modal.
- * @param {import('discord.js').UserSelectMenuInteraction} interaction
- */
-async function handleUserSelect(interaction) {
-  if (interaction.customId !== BOARD.PICK_ADVENTURER) return false;
-
-  if (!interaction.guild || !interaction.channel) {
-    await interaction.reply({
-      content: 'That only works inside a server channel.',
-      ephemeral: true,
-    });
-    return true;
-  }
-
+function showEditCategoriesModal(interaction) {
   const guildId = interaction.guild.id;
-  const board = db.getBoard(guildId);
-  if (!board || board.channelId !== interaction.channel.id) {
-    await interaction.reply({
-      content:
-        'This isn’t the active Quest Board channel anymore. Ask an admin to run `/setup-quests` here.',
-      ephemeral: true,
-    });
-    return true;
-  }
+  const names = db.getCategories(guildId);
+  const modal = new ModalBuilder()
+    .setCustomId(MODAL.EDIT_CATEGORIES)
+    .setTitle('Quest categories');
 
-  const assigneeId = interaction.values[0];
-  remember(interaction.user.id, assigneeId);
-  await openCreateQuestModal(interaction);
-  return true;
+  const lines = new TextInputBuilder()
+    .setCustomId(FIELDS.CATEGORY_LINES)
+    .setLabel('One category per line (max 24)')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(true)
+    .setMaxLength(2000)
+    .setValue(names.join('\n'));
+
+  modal.addComponents(new ActionRowBuilder().addComponents(lines));
+  return interaction.showModal(modal);
 }
 
-/**
- * @param {import('discord.js').ModalSubmitInteraction} interaction
- */
-async function handleModalSubmit(interaction) {
-  if (interaction.customId !== MODAL.CREATE) return false;
-
+async function assertBoardChannel(interaction) {
   if (!interaction.guild || !interaction.channel) {
     await interaction.reply({
       content: 'Quests need a proper server channel to live in.',
       ephemeral: true,
     });
-    return true;
+    return false;
   }
-
   const guildId = interaction.guild.id;
   const board = db.getBoard(guildId);
-  if (!board || board.channelId !== interaction.channel.id) {
+  if (!board || String(board.channelId) !== String(interaction.channel.id)) {
     await interaction.reply({
       content:
         'This channel isn’t the active Quest Board. Ask an admin to run `/setup-quests` here first, then try again.',
       ephemeral: true,
     });
-    return true;
+    return false;
   }
+  return true;
+}
 
-  const assigneeId = take(interaction.user.id);
-  if (!assigneeId) {
-    await interaction.reply({
-      content: 'Something went wrong picking the adventurer. Try again.',
-      ephemeral: true,
-    });
-    return true;
-  }
-
-  const title = interaction.fields.getTextInputValue(FIELDS.TITLE).trim();
-  const description = interaction.fields.getTextInputValue(FIELDS.DESCRIPTION) ?? '';
-  const category = interaction.fields.getTextInputValue(FIELDS.CATEGORY) ?? '';
-
-  if (!title) {
-    remember(interaction.user.id, assigneeId);
-    await interaction.reply({
-      content: 'Every quest needs a name — pop in a short title and submit again.',
-      ephemeral: true,
-    });
-    return true;
-  }
-
+/**
+ * @param {import('discord.js').ModalSubmitInteraction} interaction
+ * @param {{ title: string, description: string, category: string, assigneeId: string, subtasks?: { label: string, done: boolean }[] }} params
+ */
+async function postQuest(interaction, { title, description, category, assigneeId, subtasks = [] }) {
   let assigneeUser;
   try {
     assigneeUser = await interaction.client.users.fetch(assigneeId);
   } catch {
-    remember(interaction.user.id, assigneeId);
     await interaction.reply({
-      content: 'Something went wrong picking the adventurer. Try again.',
+      content: 'I couldn’t find that user. Check the mention or ID.',
       ephemeral: true,
     });
     return true;
@@ -161,10 +208,9 @@ async function handleModalSubmit(interaction) {
 
   const inGuild = await interaction.guild.members.fetch(assigneeId).catch(() => null);
   if (!inGuild) {
-    remember(interaction.user.id, assigneeId);
     await interaction.reply({
       content:
-        'That adventurer isn’t in this server anymore (or I can’t see them). Fix the roster or pick someone else — open **Create Quest** again.',
+        'That person isn’t in this server (or I can’t see them). Pick someone on the member list.',
       ephemeral: true,
     });
     return true;
@@ -180,12 +226,13 @@ async function handleModalSubmit(interaction) {
 
   const quest = {
     id: questId,
-    guildId,
+    guildId: interaction.guild.id,
     channelId: interaction.channel.id,
     messageId: '',
     title,
     description,
     category,
+    subtasks,
     creatorId: interaction.user.id,
     assigneeId: assigneeUser.id,
     status: STATUS.NOT_STARTED,
@@ -222,8 +269,174 @@ async function handleModalSubmit(interaction) {
   return true;
 }
 
+/**
+ * @param {import('discord.js').ModalSubmitInteraction} interaction
+ */
+async function handleModalSubmit(interaction) {
+  if (interaction.customId === MODAL.EDIT_CATEGORIES) {
+    if (!interaction.guild || !interaction.channel) {
+      await interaction.reply({
+        content: 'Categories can only be edited from a server channel.',
+        ephemeral: true,
+      });
+      return true;
+    }
+    const guildId = interaction.guild.id;
+    const board = db.getBoard(guildId);
+    if (!board || String(board.channelId) !== String(interaction.channel.id)) {
+      await interaction.reply({
+        content: 'Use **Edit categories** on the Quest Board channel.',
+        ephemeral: true,
+      });
+      return true;
+    }
+    const raw = interaction.fields.getTextInputValue(FIELDS.CATEGORY_LINES);
+    const lines = raw
+      .split(/\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const saved = db.setCategories(guildId, lines);
+    await interaction.reply({
+      ephemeral: true,
+      content: `Saved **${saved.length}** category names (used for **Quest snapshot** grouping and as suggestions).`,
+    });
+    return true;
+  }
+
+  if (interaction.customId === MODAL.CREATE_SLASH) {
+    if (!(await assertBoardChannel(interaction))) return true;
+    const draft = questDraft.take(interaction.user.id);
+    if (!draft?.assigneeId || draft.categoryValue == null) {
+      await interaction.reply({
+        content:
+          'That session expired. Run **`/create-quest`** again and pick assignee + category.',
+        ephemeral: true,
+      });
+      return true;
+    }
+    if (draft.categoryValue === '__other__') {
+      await interaction.reply({
+        content: 'Something got out of sync — run **`/create-quest`** again.',
+        ephemeral: true,
+      });
+      return true;
+    }
+    const title = interaction.fields.getTextInputValue(FIELDS.TITLE).trim();
+    const description = interaction.fields.getTextInputValue(FIELDS.DESCRIPTION) ?? '';
+    const category = String(draft.categoryValue).trim();
+    if (!title) {
+      await interaction.reply({
+        content: 'Every quest needs a **title**.',
+        ephemeral: true,
+      });
+      return true;
+    }
+    if (!category) {
+      await interaction.reply({
+        content: 'Missing category — try **`/create-quest`** again.',
+        ephemeral: true,
+      });
+      return true;
+    }
+    const subtasks = parseSubtasksFromText(
+      interaction.fields.getTextInputValue(FIELDS.SUBTASKS) ?? ''
+    );
+    return postQuest(interaction, {
+      title,
+      description,
+      category,
+      assigneeId: draft.assigneeId,
+      subtasks,
+    });
+  }
+
+  if (interaction.customId === MODAL.CREATE_SLASH_OTHER) {
+    if (!(await assertBoardChannel(interaction))) return true;
+    const draft = questDraft.take(interaction.user.id);
+    if (!draft?.assigneeId || draft.categoryValue !== '__other__') {
+      await interaction.reply({
+        content:
+          'That session expired. Run **`/create-quest`** again and pick **Other** for category.',
+        ephemeral: true,
+      });
+      return true;
+    }
+    const title = interaction.fields.getTextInputValue(FIELDS.TITLE).trim();
+    const description = interaction.fields.getTextInputValue(FIELDS.DESCRIPTION) ?? '';
+    const category = (
+      interaction.fields.getTextInputValue(FIELDS.CATEGORY_CUSTOM) ?? ''
+    ).trim();
+    if (!title) {
+      await interaction.reply({
+        content: 'Every quest needs a **title**.',
+        ephemeral: true,
+      });
+      return true;
+    }
+    if (!category) {
+      await interaction.reply({
+        content: 'Give this quest a **category name**.',
+        ephemeral: true,
+      });
+      return true;
+    }
+    const subtasks = parseSubtasksFromText(
+      interaction.fields.getTextInputValue(FIELDS.SUBTASKS) ?? ''
+    );
+    return postQuest(interaction, {
+      title,
+      description,
+      category,
+      assigneeId: draft.assigneeId,
+      subtasks,
+    });
+  }
+
+  if (interaction.customId !== MODAL.CREATE) return false;
+
+  if (!(await assertBoardChannel(interaction))) return true;
+
+  const title = interaction.fields.getTextInputValue(FIELDS.TITLE).trim();
+  const description = interaction.fields.getTextInputValue(FIELDS.DESCRIPTION) ?? '';
+  const assigneeRaw = interaction.fields.getTextInputValue(FIELDS.ASSIGNEE);
+  const category = (interaction.fields.getTextInputValue(FIELDS.CATEGORY) ?? '').trim();
+
+  const assigneeId = parseDiscordUserId(assigneeRaw);
+  if (!assigneeId) {
+    await interaction.reply({
+      content:
+        '**Assignee** must be a **@mention** (click the user) or their **numeric user ID**.',
+      ephemeral: true,
+    });
+    return true;
+  }
+
+  if (!category) {
+    await interaction.reply({
+      content: 'Give this quest a **category** (one short word or phrase).',
+      ephemeral: true,
+    });
+    return true;
+  }
+
+  if (!title) {
+    await interaction.reply({
+      content: 'Every quest needs a **title**.',
+      ephemeral: true,
+    });
+    return true;
+  }
+
+  const subtasks = parseSubtasksFromText(
+    interaction.fields.getTextInputValue(FIELDS.SUBTASKS) ?? ''
+  );
+  return postQuest(interaction, { title, description, category, assigneeId, subtasks });
+}
+
 module.exports = {
-  showAssigneePicker,
-  handleUserSelect,
+  buildCreateQuestModal,
+  buildCreateQuestModalSlash,
+  buildCreateQuestModalSlashOther,
+  showEditCategoriesModal,
   handleModalSubmit,
 };

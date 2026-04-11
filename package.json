@@ -12,6 +12,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "canvas": "^3.2.3",
+    "dejavu-fonts-ttf": "^2.37.3",
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5"
   }

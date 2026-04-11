@@ -4,6 +4,11 @@ const {
   ButtonBuilder,
   ButtonStyle,
 } = require('discord.js');
+const { BOARD } = require('./ids');
+const {
+  getSubtasks,
+  formatSubtasksForEmbed,
+} = require('./subtasks');
 
 /** Status keys stored in JSON */
 const STATUS = {
@@ -31,19 +36,23 @@ function questIdLabel(id) {
 
 /**
  * Welcome embed for the pinned-style Quest Board message.
+ * @param {{ archiveHint?: string }} [opts]
  */
-function buildBoardEmbed() {
+function buildBoardEmbed(opts = {}) {
+  const { archiveHint } = opts;
+  const lines = [
+    'Got an idea for the server? Turn it into a **quest**.',
+    'Assign it to yourself or a friend and keep the village moving.',
+    '',
+    '*No pressure, no deadlines — just shared server goals.*',
+  ];
+  if (archiveHint) {
+    lines.push('', `✅ **Finished quests** get filed in ${archiveHint}.`);
+  }
   return new EmbedBuilder()
     .setColor(0x8bc34a)
     .setTitle('🗺️ Quest Board')
-    .setDescription(
-      [
-        'Got an idea for the server? Turn it into a **quest**.',
-        'Assign it to yourself or a friend and keep the village moving.',
-        '',
-        '*No pressure, no deadlines — just shared server goals.*',
-      ].join('\n')
-    )
+    .setDescription(lines.join('\n'))
     .addFields(
       {
         name: 'How it works',
@@ -54,11 +63,36 @@ function buildBoardEmbed() {
       {
         name: 'Village tips',
         value:
-          'After **Create Quest**, pick an adventurer from Discord’s **user menu**, then name the quest in the popup. ' +
-          'Only that adventurer can **Start Quest**; either of you can **Complete Quest** (yep, even straight from fresh dirt if you like).',
+          '**`/create-quest`** uses **dropdowns** for assignee + category, then a short modal (add **subtasks** as one line each). The **Create Quest** button uses the full form. ' +
+          'Check off **subtasks** on the card, or use **Complete Quest** anytime. When every subtask is checked, the quest completes automatically. Admins: **Edit categories**.',
       }
     )
     .setFooter({ text: 'Cozy server goals & silly builds — keep the realm chill.' });
+}
+
+/** Board message: main row + categories row. */
+function buildBoardComponents() {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(BOARD.CREATE_BUTTON)
+        .setLabel('Create Quest')
+        .setEmoji('✨')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(BOARD.STATUS_BUTTON)
+        .setLabel('Quest snapshot')
+        .setEmoji('📊')
+        .setStyle(ButtonStyle.Primary)
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(BOARD.EDIT_CATEGORIES)
+        .setLabel('Edit categories')
+        .setEmoji('🏷️')
+        .setStyle(ButtonStyle.Secondary)
+    ),
+  ];
 }
 
 /**
@@ -85,16 +119,26 @@ function buildQuestEmbed(quest, { assigneeMention, creatorMention }) {
     completedLine = `<t:${c}:F>`;
   }
 
+  const cat = quest.category && quest.category.trim().length > 0 ? quest.category.trim() : '';
+  let titleText = cat ? `📜 [${cat}] ${quest.title}` : `📜 ${quest.title}`;
+  if (titleText.length > 256) titleText = `${titleText.slice(0, 252)}…`;
+
+  const subs = getSubtasks(quest);
+  let subtasksBlock = formatSubtasksForEmbed(subs);
+  if (subtasksBlock.length > 1800) {
+    subtasksBlock = `${subtasksBlock.slice(0, 1780)}\n… *(list truncated)*`;
+  }
+
+  const descLines = [`**Notes** · ${desc}`];
+  if (subtasksBlock) {
+    descLines.push('', '**Subtasks**', subtasksBlock);
+  }
+  descLines.push('', `**Category** · ${category}`);
+
   return new EmbedBuilder()
     .setColor(COLORS[quest.status] ?? COLORS[STATUS.NOT_STARTED])
-    .setTitle(`📜 ${quest.title}`)
-    .setDescription(
-      [
-        `**Notes** · ${desc}`,
-        '',
-        `**Category** · ${category}`,
-      ].join('\n')
-    )
+    .setTitle(titleText)
+    .setDescription(descLines.join('\n'))
     .addFields(
       { name: 'Created by', value: creatorMention, inline: true },
       { name: 'Assigned to', value: assigneeMention, inline: true },
@@ -117,7 +161,14 @@ function buildQuestEmbed(quest, { assigneeMention, creatorMention }) {
     );
 }
 
-/** Button row for a quest card — custom IDs must stay `quest:{action}:{id}` for handlers. */
+function subtaskButtonLabel(s) {
+  const prefix = s.done ? '☑ ' : '☐ ';
+  const max = 80 - prefix.length;
+  const t = s.label.length > max ? `${s.label.slice(0, Math.max(0, max - 1))}…` : s.label;
+  return `${prefix}${t}`;
+}
+
+/** Main row + optional subtask toggle rows (max 5 component rows total). */
 function questComponents(quest) {
   const completed = quest.status === STATUS.COMPLETED;
   const start = new ButtonBuilder()
@@ -141,12 +192,39 @@ function questComponents(quest) {
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(completed || quest.status !== STATUS.WORKING);
 
-  return [new ActionRowBuilder().addComponents(start, complete, reset)];
+  const rows = [
+    new ActionRowBuilder().addComponents(start, complete, reset),
+  ];
+
+  const subs = getSubtasks(quest);
+  if (subs.length > 0 && !completed) {
+    let row = new ActionRowBuilder();
+    for (let i = 0; i < subs.length; i++) {
+      if (rows.length >= 5) break;
+      const s = subs[i];
+      const btn = new ButtonBuilder()
+        .setCustomId(`quest:subtask:${quest.id}:${i}`)
+        .setLabel(subtaskButtonLabel(s))
+        .setStyle(s.done ? ButtonStyle.Success : ButtonStyle.Secondary);
+      if (row.components.length >= 5) {
+        rows.push(row);
+        row = new ActionRowBuilder();
+      }
+      if (rows.length >= 5) break;
+      row.addComponents(btn);
+    }
+    if (row.components.length > 0 && rows.length < 5) {
+      rows.push(row);
+    }
+  }
+
+  return rows;
 }
 
 module.exports = {
   STATUS,
   buildBoardEmbed,
+  buildBoardComponents,
   buildQuestEmbed,
   questComponents,
 };

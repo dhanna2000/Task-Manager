@@ -13,6 +13,10 @@ const DEFAULT_STATE = {
   nextQuestId: 1,
   /** guildId -> { channelId, messageId } */
   boards: {},
+  /** guildId -> channelId where completed quest cards are moved */
+  archives: {},
+  /** guildId -> string[] category names (max 24 used in dropdown + "Other") */
+  categories: {},
   /** id -> quest record */
   quests: {},
 };
@@ -34,6 +38,8 @@ function loadState() {
     return {
       nextQuestId: parsed.nextQuestId ?? 1,
       boards: parsed.boards ?? {},
+      archives: parsed.archives ?? {},
+      categories: parsed.categories ?? {},
       quests: parsed.quests ?? {},
     };
   } catch {
@@ -57,6 +63,48 @@ function setBoard(guildId, channelId, messageId) {
   const s = loadState();
   s.boards[guildId] = { channelId, messageId };
   saveState(s);
+}
+
+function getArchiveChannel(guildId) {
+  const s = loadState();
+  const key = String(guildId);
+  const id = s.archives?.[key] ?? s.archives?.[guildId];
+  return id != null ? String(id) : null;
+}
+
+function setArchiveChannel(guildId, channelId) {
+  const s = loadState();
+  if (!s.archives) s.archives = {};
+  s.archives[String(guildId)] = String(channelId);
+  saveState(s);
+}
+
+/** All quests for a guild (for snapshots / stats). */
+function getGuildQuests(guildId) {
+  const s = loadState();
+  return Object.values(s.quests).filter((q) => q.guildId === guildId);
+}
+
+const DEFAULT_CATEGORIES = ['Build', 'Mining', 'Farming', 'Decoration'];
+
+/** Up to 24 names (+ UI adds “Other”) = 25 string-select options max. */
+function getCategories(guildId) {
+  const s = loadState();
+  const custom = s.categories?.[String(guildId)] ?? [];
+  const merged = [...new Set([...DEFAULT_CATEGORIES, ...custom])]
+    .map((x) => String(x).trim())
+    .filter(Boolean);
+  merged.sort((a, b) => a.localeCompare(b));
+  return merged.slice(0, 24);
+}
+
+function setCategories(guildId, names) {
+  const s = loadState();
+  if (!s.categories) s.categories = {};
+  const cleaned = [...new Set(names.map((n) => String(n).trim()).filter(Boolean))].slice(0, 24);
+  s.categories[String(guildId)] = cleaned;
+  saveState(s);
+  return cleaned;
 }
 
 function getQuest(questId) {
@@ -98,6 +146,11 @@ function updateQuest(questId, patch) {
 module.exports = {
   getBoard,
   setBoard,
+  getArchiveChannel,
+  setArchiveChannel,
+  getGuildQuests,
+  getCategories,
+  setCategories,
   getQuest,
   allocateQuestId,
   putQuest,

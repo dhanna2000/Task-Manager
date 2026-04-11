@@ -6,6 +6,9 @@
 require('dotenv').config();
 const { REST, Routes } = require('discord.js');
 const setup = require('./commands/setup-quests');
+const listQuests = require('./commands/list-quests');
+const listArchived = require('./commands/list-archived');
+const createQuest = require('./commands/create-quest');
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
@@ -17,10 +20,10 @@ if (!token || !clientId || !guildId) {
 }
 
 const body = [
-  {
-    name: setup.data.name,
-    description: setup.data.description,
-  },
+  setup.data.toJSON(),
+  listQuests.data.toJSON(),
+  listArchived.data.toJSON(),
+  createQuest.data.toJSON(),
 ];
 
 const rest = new REST({ version: '10' }).setToken(token);
