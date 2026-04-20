@@ -1,6 +1,6 @@
 /**
  * Quest Board bot — entry point.
- * Slash: setup + list-quests + list-archived + create-quest; rest is buttons + modals.
+ * Slash: setup + list-quests + list-archived + create-quest + assign-gather; rest is buttons + modals.
  */
 
 require('dotenv').config();
@@ -9,6 +9,7 @@ const setup = require('./commands/setup-quests');
 const listQuests = require('./commands/list-quests');
 const listArchived = require('./commands/list-archived');
 const createQuest = require('./commands/create-quest');
+const assignGather = require('./commands/assign-gather');
 const { handleButton } = require('./interactions/handleButtons');
 const { handleModalSubmit } = require('./interactions/handleModals');
 
@@ -49,6 +50,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await listArchived.execute(interaction);
       } else if (interaction.commandName === createQuest.data.name) {
         await createQuest.execute(interaction);
+      } else if (interaction.commandName === assignGather.data.name) {
+        await assignGather.execute(interaction);
       }
       return;
     }

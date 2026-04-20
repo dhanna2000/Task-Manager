@@ -8,6 +8,7 @@ const db = require('../storage/database');
 const { MODAL, FIELDS } = require('../utils/ids');
 const { parseDiscordUserId } = require('../utils/parseAssignee');
 const questDraft = require('./questDraft');
+const gatherDraft = require('./gatherDraft');
 const { STATUS, buildQuestEmbed, questComponents } = require('../utils/embeds');
 const { parseSubtasksFromText } = require('../utils/subtasks');
 
@@ -150,6 +151,44 @@ function buildCreateQuestModalSlashOther() {
   return modal;
 }
 
+/** After `/assign-gather` with assignee already chosen. */
+function buildGatherModalSlash() {
+  const modal = new ModalBuilder()
+    .setCustomId(MODAL.GATHER_SLASH)
+    .setTitle('Assign gather');
+
+  const titleInput = new TextInputBuilder()
+    .setCustomId(FIELDS.TITLE)
+    .setLabel('Title')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(100)
+    .setPlaceholder('e.g. Stock the community chest');
+
+  const descInput = new TextInputBuilder()
+    .setCustomId(FIELDS.DESCRIPTION)
+    .setLabel('Notes (optional)')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(false)
+    .setMaxLength(500)
+    .setPlaceholder('Where to put things, stack sizes, etc.');
+
+  const itemsInput = new TextInputBuilder()
+    .setCustomId(FIELDS.SUBTASKS)
+    .setLabel('Blocks / items — one per line')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(true)
+    .setMaxLength(2000)
+    .setPlaceholder('64× cobblestone\n2 stacks oak logs\n1× shulker of sand');
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(titleInput),
+    new ActionRowBuilder().addComponents(descInput),
+    new ActionRowBuilder().addComponents(itemsInput)
+  );
+  return modal;
+}
+
 function showEditCategoriesModal(interaction) {
   const guildId = interaction.guild.id;
   const names = db.getCategories(guildId);
@@ -192,9 +231,9 @@ async function assertBoardChannel(interaction) {
 
 /**
  * @param {import('discord.js').ModalSubmitInteraction} interaction
- * @param {{ title: string, description: string, category: string, assigneeId: string, subtasks?: { label: string, done: boolean }[] }} params
+ * @param {{ title: string, description: string, category: string, assigneeId: string, subtasks?: { label: string, done: boolean }[], kind?: 'gather' }} params
  */
-async function postQuest(interaction, { title, description, category, assigneeId, subtasks = [] }) {
+async function postQuest(interaction, { title, description, category, assigneeId, subtasks = [], kind }) {
   let assigneeUser;
   try {
     assigneeUser = await interaction.client.users.fetch(assigneeId);
@@ -224,6 +263,8 @@ async function postQuest(interaction, { title, description, category, assigneeId
   const questId = db.allocateQuestId();
   const createdAt = Date.now();
 
+  const resolvedCategory = kind === 'gather' ? 'Gather' : category;
+
   const quest = {
     id: questId,
     guildId: interaction.guild.id,
@@ -231,13 +272,14 @@ async function postQuest(interaction, { title, description, category, assigneeId
     messageId: '',
     title,
     description,
-    category,
+    category: resolvedCategory,
     subtasks,
     creatorId: interaction.user.id,
     assigneeId: assigneeUser.id,
     status: STATUS.NOT_STARTED,
     createdAt,
     completedAt: null,
+    ...(kind === 'gather' ? { kind: 'gather' } : {}),
   };
 
   const embed = buildQuestEmbed(quest, {
@@ -262,8 +304,12 @@ async function postQuest(interaction, { title, description, category, assigneeId
   quest.messageId = message.id;
   db.putQuest(quest);
 
+  const doneLine =
+    kind === 'gather'
+      ? `Gather order **${title}** is on the board for ${assigneeMention}.`
+      : `Nice — **${title}** is on the board and assigned to ${assigneeMention}.`;
   await interaction.editReply({
-    content: `Nice — **${title}** is on the board and assigned to ${assigneeMention}.`,
+    content: doneLine,
   });
 
   return true;
@@ -301,6 +347,46 @@ async function handleModalSubmit(interaction) {
       content: `Saved **${saved.length}** category names (used for **Quest snapshot** grouping and as suggestions).`,
     });
     return true;
+  }
+
+  if (interaction.customId === MODAL.GATHER_SLASH) {
+    if (!(await assertBoardChannel(interaction))) return true;
+    const draft = gatherDraft.take(interaction.user.id);
+    if (!draft?.assigneeId) {
+      await interaction.reply({
+        content:
+          'That session expired. Run **`/assign-gather`** again and pick who should gather.',
+        ephemeral: true,
+      });
+      return true;
+    }
+    const title = interaction.fields.getTextInputValue(FIELDS.TITLE).trim();
+    const description = interaction.fields.getTextInputValue(FIELDS.DESCRIPTION) ?? '';
+    const subtasks = parseSubtasksFromText(
+      interaction.fields.getTextInputValue(FIELDS.SUBTASKS) ?? ''
+    );
+    if (!title) {
+      await interaction.reply({
+        content: 'Give this gather order a **title**.',
+        ephemeral: true,
+      });
+      return true;
+    }
+    if (subtasks.length === 0) {
+      await interaction.reply({
+        content: 'List at least one **block or item** (one per line).',
+        ephemeral: true,
+      });
+      return true;
+    }
+    return postQuest(interaction, {
+      title,
+      description,
+      category: 'Gather',
+      assigneeId: draft.assigneeId,
+      subtasks,
+      kind: 'gather',
+    });
   }
 
   if (interaction.customId === MODAL.CREATE_SLASH) {
@@ -437,6 +523,7 @@ module.exports = {
   buildCreateQuestModal,
   buildCreateQuestModalSlash,
   buildCreateQuestModalSlashOther,
+  buildGatherModalSlash,
   showEditCategoriesModal,
   handleModalSubmit,
 };

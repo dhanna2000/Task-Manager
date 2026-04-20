@@ -15,6 +15,8 @@ const MODAL = {
   CREATE_SLASH: 'questModal:createSlash',
   /** Same but category = Other → custom name field */
   CREATE_SLASH_OTHER: 'questModal:createSlashOther',
+  /** After `/assign-gather` — assignee chosen, list items in modal */
+  GATHER_SLASH: 'questModal:gatherSlash',
   EDIT_CATEGORIES: 'questModal:editCategories',
 };
 

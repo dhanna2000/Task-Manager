@@ -9,6 +9,7 @@ const setup = require('./commands/setup-quests');
 const listQuests = require('./commands/list-quests');
 const listArchived = require('./commands/list-archived');
 const createQuest = require('./commands/create-quest');
+const assignGather = require('./commands/assign-gather');
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
@@ -24,6 +25,7 @@ const body = [
   listQuests.data.toJSON(),
   listArchived.data.toJSON(),
   createQuest.data.toJSON(),
+  assignGather.data.toJSON(),
 ];
 
 const rest = new REST({ version: '10' }).setToken(token);

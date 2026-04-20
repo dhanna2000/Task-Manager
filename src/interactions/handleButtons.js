@@ -126,8 +126,9 @@ async function handleButton(interaction) {
     const isAssignee = userId === quest.assigneeId;
     const isCreator = userId === quest.creatorId;
     if (!isAssignee && !isCreator) {
+      const w = quest.kind === 'gather' ? 'items' : 'subtasks';
       return interaction.reply({
-        content: 'Only the assignee or creator can check off subtasks.',
+        content: `Only the assignee or creator can check off ${w}.`,
         ephemeral: true,
       });
     }
@@ -140,8 +141,9 @@ async function handleButton(interaction) {
     }
     const subs = getSubtasks(quest);
     if (subParsed.subtaskIndex < 0 || subParsed.subtaskIndex >= subs.length) {
+      const w = quest.kind === 'gather' ? 'That line' : 'That subtask';
       return interaction.reply({
-        content: 'That subtask no longer exists — the card may be out of date.',
+        content: `${w} no longer exists — the card may be out of date.`,
         ephemeral: true,
       });
     }
@@ -208,8 +210,12 @@ async function handleButton(interaction) {
 
   if (parsed.action === 'start') {
     if (!isAssignee) {
+      const line =
+        quest.kind === 'gather'
+          ? 'Only the assigned player can start this gather order.'
+          : 'Only the assigned adventurer can start this quest.';
       return interaction.reply({
-        content: 'Only the assigned adventurer can start this quest.',
+        content: line,
         ephemeral: true,
       });
     }
@@ -225,8 +231,12 @@ async function handleButton(interaction) {
 
   if (parsed.action === 'complete') {
     if (!isAssignee && !isCreator) {
+      const line =
+        quest.kind === 'gather'
+          ? 'Only the assigned player or the person who assigned this gather order can complete it.'
+          : 'Only the assigned adventurer or the quest creator can complete this quest.';
       return interaction.reply({
-        content: 'Only the assigned adventurer or the quest creator can complete this quest.',
+        content: line,
         ephemeral: true,
       });
     }
@@ -239,8 +249,12 @@ async function handleButton(interaction) {
 
   if (parsed.action === 'reset') {
     if (!isAssignee && !isCreator) {
+      const line =
+        quest.kind === 'gather'
+          ? 'Only the assigned player or the person who assigned this gather order can reset it.'
+          : 'Only the assigned adventurer or the creator can reset this quest.';
       return interaction.reply({
-        content: 'Only the assigned adventurer or the creator can reset this quest.',
+        content: line,
         ephemeral: true,
       });
     }

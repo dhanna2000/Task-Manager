@@ -119,8 +119,10 @@ function buildQuestEmbed(quest, { assigneeMention, creatorMention }) {
     completedLine = `<t:${c}:F>`;
   }
 
+  const isGather = quest.kind === 'gather';
   const cat = quest.category && quest.category.trim().length > 0 ? quest.category.trim() : '';
-  let titleText = cat ? `📜 [${cat}] ${quest.title}` : `📜 ${quest.title}`;
+  const titleEmoji = isGather ? '📦' : '📜';
+  let titleText = cat ? `${titleEmoji} [${cat}] ${quest.title}` : `${titleEmoji} ${quest.title}`;
   if (titleText.length > 256) titleText = `${titleText.slice(0, 252)}…`;
 
   const subs = getSubtasks(quest);
@@ -131,7 +133,7 @@ function buildQuestEmbed(quest, { assigneeMention, creatorMention }) {
 
   const descLines = [`**Notes** · ${desc}`];
   if (subtasksBlock) {
-    descLines.push('', '**Subtasks**', subtasksBlock);
+    descLines.push('', isGather ? '**Items to collect**' : '**Subtasks**', subtasksBlock);
   }
   descLines.push('', `**Category** · ${category}`);
 
@@ -170,17 +172,18 @@ function subtaskButtonLabel(s) {
 
 /** Main row + optional subtask toggle rows (max 5 component rows total). */
 function questComponents(quest) {
+  const isGather = quest.kind === 'gather';
   const completed = quest.status === STATUS.COMPLETED;
   const start = new ButtonBuilder()
     .setCustomId(`quest:start:${quest.id}`)
-    .setLabel('Start Quest')
+    .setLabel(isGather ? 'Start gathering' : 'Start Quest')
     .setEmoji('▶️')
     .setStyle(ButtonStyle.Primary)
     .setDisabled(completed || quest.status === STATUS.WORKING);
 
   const complete = new ButtonBuilder()
     .setCustomId(`quest:complete:${quest.id}`)
-    .setLabel('Complete Quest')
+    .setLabel(isGather ? 'Complete' : 'Complete Quest')
     .setEmoji('🏆')
     .setStyle(ButtonStyle.Success)
     .setDisabled(completed);
