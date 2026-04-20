@@ -30,7 +30,11 @@ module.exports = {
     if (!itemCh) {
       return interaction.reply({
         content:
-          '**Item collection isn’t set up yet.** An admin must run **`/setup-quests item-collection`** in **this** channel first — then **`/assign-gather`** will work here. (This is **not** the Quest Board; that’s only for **`/create-quest`**.)',
+          '**Item collection isn’t set up yet.**\n\n' +
+          'An **admin** (Manage Server or Administrator) must run the **slash command** in **this** channel. **Typing the words as a normal message does nothing** — Discord only runs commands from the **/** menu.\n\n' +
+          '**How:** type **/** → choose **setup-quests** → choose **item-collection** → run it here.\n\n' +
+          'If **item-collection** doesn’t appear under **setup-quests**, redeploy slash commands on the bot host (`npm run deploy-commands`) and restart the bot.\n\n' +
+          'After that, **/assign-gather** works here. (Regular quests stay on the Quest Board with **/create-quest**.)',
         ephemeral: true,
       });
     }
