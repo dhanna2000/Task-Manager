@@ -252,8 +252,7 @@ async function assertItemCollectionChannel(interaction) {
 
   if (String(itemCh) !== hereId) {
     await interaction.reply({
-      content:
-        `This form must be submitted from <#${itemCh}>. Open **`/assign-gather`** there (item collection channel — not the Quest Board).`,
+      content: `This form must be submitted from <#${itemCh}>. Open \`/assign-gather\` there (item collection channel — not the Quest Board).`,
       ephemeral: true,
     });
     return false;

@@ -118,7 +118,7 @@ module.exports = {
       db.setItemCollectionChannel(guildId, chId);
       return interaction.reply({
         content:
-          `✅ **Item collection channel set** — run **`/assign-gather`** here (not in the Quest Board channel). Gather cards will post in <#${chId}>.`,
+          `✅ **Item collection channel set** — run \`/assign-gather\` here (not in the Quest Board channel). Gather cards will post in <#${chId}>.`,
         ephemeral: true,
       });
     }

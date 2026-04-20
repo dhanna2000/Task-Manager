@@ -38,7 +38,7 @@ module.exports = {
     if (String(itemCh) !== hereId) {
       return interaction.reply({
         content:
-          `**Assign-gather** is locked to <#${itemCh}>. Run the command there, **or** ask an admin to run **`/setup-quests item-collection`** in <#${hereId}> to switch the item collection channel to this one.`,
+          `**Assign-gather** is locked to <#${itemCh}>. Run the command there, **or** ask an admin to run \`/setup-quests item-collection\` in <#${hereId}> to switch the item collection channel to this one.`,
         ephemeral: true,
       });
     }
