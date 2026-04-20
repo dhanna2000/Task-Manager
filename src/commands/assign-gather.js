@@ -23,11 +23,22 @@ module.exports = {
         ephemeral: true,
       });
     }
-    const board = db.getBoard(interaction.guild.id);
-    if (!board || String(board.channelId) !== String(interaction.channel.id)) {
+    const guildId = interaction.guild.id;
+    const itemCh = db.getItemCollectionChannel(guildId);
+    const hereId = String(interaction.channel.id);
+
+    if (!itemCh) {
       return interaction.reply({
         content:
-          'Run **`/assign-gather`** in the **Quest Board** channel (same place as **`/create-quest`**).',
+          '**Item collection isn’t set up yet.** An admin must run **`/setup-quests item-collection`** in **this** channel first — then **`/assign-gather`** will work here. (This is **not** the Quest Board; that’s only for **`/create-quest`**.)',
+        ephemeral: true,
+      });
+    }
+
+    if (String(itemCh) !== hereId) {
+      return interaction.reply({
+        content:
+          `**Assign-gather** is locked to <#${itemCh}>. Run the command there, **or** ask an admin to run **`/setup-quests item-collection`** in <#${hereId}> to switch the item collection channel to this one.`,
         ephemeral: true,
       });
     }

@@ -229,6 +229,38 @@ async function assertBoardChannel(interaction) {
   return true;
 }
 
+async function assertItemCollectionChannel(interaction) {
+  if (!interaction.guild || !interaction.channel) {
+    await interaction.reply({
+      content: 'Gather orders need a proper server channel to live in.',
+      ephemeral: true,
+    });
+    return false;
+  }
+  const guildId = interaction.guild.id;
+  const itemCh = db.getItemCollectionChannel(guildId);
+  const hereId = String(interaction.channel.id);
+
+  if (!itemCh) {
+    await interaction.reply({
+      content:
+        '**Item collection isn’t set up yet.** An admin must run **`/setup-quests item-collection`** in the channel where you use **`/assign-gather`**, then submit the form again.',
+      ephemeral: true,
+    });
+    return false;
+  }
+
+  if (String(itemCh) !== hereId) {
+    await interaction.reply({
+      content:
+        `This form must be submitted from <#${itemCh}>. Open **`/assign-gather`** there (item collection channel — not the Quest Board).`,
+      ephemeral: true,
+    });
+    return false;
+  }
+  return true;
+}
+
 /**
  * @param {import('discord.js').ModalSubmitInteraction} interaction
  * @param {{ title: string, description: string, category: string, assigneeId: string, subtasks?: { label: string, done: boolean }[], kind?: 'gather' }} params
@@ -350,7 +382,7 @@ async function handleModalSubmit(interaction) {
   }
 
   if (interaction.customId === MODAL.GATHER_SLASH) {
-    if (!(await assertBoardChannel(interaction))) return true;
+    if (!(await assertItemCollectionChannel(interaction))) return true;
     const draft = gatherDraft.take(interaction.user.id);
     if (!draft?.assigneeId) {
       await interaction.reply({

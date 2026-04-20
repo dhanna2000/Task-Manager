@@ -15,6 +15,8 @@ const DEFAULT_STATE = {
   boards: {},
   /** guildId -> channelId where completed quest cards are moved */
   archives: {},
+  /** guildId -> channelId where /assign-gather runs and gather cards are posted */
+  itemCollectionChannels: {},
   /** guildId -> string[] category names (max 24 used in dropdown + "Other") */
   categories: {},
   /** id -> quest record */
@@ -39,6 +41,7 @@ function loadState() {
       nextQuestId: parsed.nextQuestId ?? 1,
       boards: parsed.boards ?? {},
       archives: parsed.archives ?? {},
+      itemCollectionChannels: parsed.itemCollectionChannels ?? {},
       categories: parsed.categories ?? {},
       quests: parsed.quests ?? {},
     };
@@ -76,6 +79,20 @@ function setArchiveChannel(guildId, channelId) {
   const s = loadState();
   if (!s.archives) s.archives = {};
   s.archives[String(guildId)] = String(channelId);
+  saveState(s);
+}
+
+function getItemCollectionChannel(guildId) {
+  const s = loadState();
+  const key = String(guildId);
+  const id = s.itemCollectionChannels?.[key] ?? s.itemCollectionChannels?.[guildId];
+  return id != null ? String(id) : null;
+}
+
+function setItemCollectionChannel(guildId, channelId) {
+  const s = loadState();
+  if (!s.itemCollectionChannels) s.itemCollectionChannels = {};
+  s.itemCollectionChannels[String(guildId)] = String(channelId);
   saveState(s);
 }
 
@@ -148,6 +165,8 @@ module.exports = {
   setBoard,
   getArchiveChannel,
   setArchiveChannel,
+  getItemCollectionChannel,
+  setItemCollectionChannel,
   getGuildQuests,
   getCategories,
   setCategories,

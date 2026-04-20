@@ -13,11 +13,18 @@ module.exports = {
   /** Put `archive` first so Discord doesn’t auto-pick `board` when people rush the submit key. */
   data: new SlashCommandBuilder()
     .setName('setup-quests')
-    .setDescription('Set up the Quest Board or the archive channel for finished quests (admins only).')
+    .setDescription(
+      'Set up the Quest Board, item collection channel, or archive for finished quests (admins only).'
+    )
     .addSubcommand((sub) =>
       sub
         .setName('archive')
         .setDescription('Save this channel for finished cards + show the list of completed quests')
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('item-collection')
+        .setDescription('Use this channel for /assign-gather (block & item collection orders)')
     )
     .addSubcommand((sub) =>
       sub.setName('board').setDescription('Post or refresh the Quest Board in this channel')
@@ -52,7 +59,7 @@ module.exports = {
     if (sub == null) {
       return interaction.reply({
         content:
-          'Pick **`archive`** or **`board`**. Tips: **`/list-quests`** (all quests) and **`/list-archived`** (completed only).\n\n' +
+          'Pick **`archive`**, **`item-collection`**, or **`board`**. Tips: **`/list-quests`** (all quests) and **`/list-archived`** (completed only).\n\n' +
           'If you don’t see subcommands, run **`npm run deploy-commands`**, restart the bot, wait a minute, and try again.',
         ephemeral: true,
       });
@@ -104,6 +111,16 @@ module.exports = {
           embeds,
         });
       }
+    }
+
+    if (sub === 'item-collection') {
+      const chId = interaction.channel.id;
+      db.setItemCollectionChannel(guildId, chId);
+      return interaction.reply({
+        content:
+          `✅ **Item collection channel set** — run **`/assign-gather`** here (not in the Quest Board channel). Gather cards will post in <#${chId}>.`,
+        ephemeral: true,
+      });
     }
 
     if (sub !== 'board') {

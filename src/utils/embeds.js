@@ -64,6 +64,7 @@ function buildBoardEmbed(opts = {}) {
         name: 'Village tips',
         value:
           '**`/create-quest`** uses **dropdowns** for assignee + category, then a short modal (add **subtasks** as one line each). The **Create Quest** button uses the full form. ' +
+          '**`/assign-gather`** lives in your **item collection** channel (admins: **`/setup-quests item-collection`** there) — list blocks/items like subtasks. ' +
           'Check off **subtasks** on the card, or use **Complete Quest** anytime. When every subtask is checked, the quest completes automatically. Admins: **Edit categories**.',
       }
     )
