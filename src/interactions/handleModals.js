@@ -244,7 +244,7 @@ async function assertItemCollectionChannel(interaction) {
   if (!itemCh) {
     await interaction.reply({
       content:
-        '**Item collection isn’t set up yet.** An admin must use the **/** menu → **setup-quests** → **item-collection** in that channel (typing as chat text does not run the command). Then open **/assign-gather** again.',
+        '**Item collection isn’t set up yet.** An admin must run **`/setup-item-collection`** in that channel (slash menu). Then submit the form again.',
       ephemeral: true,
     });
     return false;

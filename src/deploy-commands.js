@@ -10,6 +10,7 @@ const listQuests = require('./commands/list-quests');
 const listArchived = require('./commands/list-archived');
 const createQuest = require('./commands/create-quest');
 const assignGather = require('./commands/assign-gather');
+const setupItemCollection = require('./commands/setup-item-collection');
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
@@ -22,6 +23,7 @@ if (!token || !clientId || !guildId) {
 
 const body = [
   setup.data.toJSON(),
+  setupItemCollection.data.toJSON(),
   listQuests.data.toJSON(),
   listArchived.data.toJSON(),
   createQuest.data.toJSON(),
