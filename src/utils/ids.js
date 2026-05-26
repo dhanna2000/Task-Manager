@@ -6,6 +6,7 @@
 const GATHER = {
   POST: 'gather:post',
   CANCEL: 'gather:cancel',
+  ADD_ITEM: 'gather:addItem',
 };
 
 const BOARD = {
@@ -22,6 +23,8 @@ const MODAL = {
   CREATE_SLASH_OTHER: 'questModal:createSlashOther',
   /** After `/assign-gather` — assignee chosen, list items in modal */
   GATHER_SLASH: 'questModal:gatherSlash',
+  /** "Add item" button on the gather draft card */
+  GATHER_ADD_ITEM: 'questModal:gatherAddItem',
   EDIT_CATEGORIES: 'questModal:editCategories',
 };
 
@@ -38,6 +41,9 @@ const FIELDS = {
   CATEGORY_CUSTOM: 'q_cat_custom',
   /** One line per sub-task / todo */
   SUBTASKS: 'q_subtasks',
+  /** Gather add-item modal fields */
+  GATHER_ITEM: 'gather_item',
+  GATHER_QTY: 'gather_qty',
 };
 
 function parseQuestButton(customId) {

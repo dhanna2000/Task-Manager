@@ -2,7 +2,7 @@ const { PermissionFlagsBits } = require('discord.js');
 const db = require('../storage/database');
 const { GATHER, BOARD, parseQuestButton, parseQuestSubtaskButton } = require('../utils/ids');
 const { getSubtasks, allSubtasksDone } = require('../utils/subtasks');
-const { showEditCategoriesModal, buildCreateQuestModal, postQuest } = require('./handleModals');
+const { showEditCategoriesModal, buildCreateQuestModal, buildAddItemModal, postQuest } = require('./handleModals');
 const { STATUS, buildQuestEmbed, questComponents } = require('../utils/embeds');
 const { buildStatusSnapshotEmbed } = require('../utils/statusSnapshot');
 const gatherDraft = require('./gatherDraft');
@@ -59,6 +59,17 @@ async function handleButton(interaction) {
       subtasks,
       kind: 'gather',
     });
+  }
+
+  if (interaction.customId === GATHER.ADD_ITEM) {
+    const draft = gatherDraft.get(interaction.user.id);
+    if (!draft) {
+      return interaction.reply({
+        content: 'That gather draft expired (15 min limit). Run `/assign-gather` again.',
+        ephemeral: true,
+      });
+    }
+    return interaction.showModal(buildAddItemModal());
   }
 
   if (interaction.customId === GATHER.CANCEL) {

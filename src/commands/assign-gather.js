@@ -1,37 +1,27 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const db = require('../storage/database');
 const gatherDraft = require('../interactions/gatherDraft');
 const MINECRAFT_ITEMS = require('../data/minecraft-items');
-const { GATHER } = require('../utils/ids');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('assign-gather')
-    .setDescription('Assign someone to collect blocks or items — add items one at a time with autocomplete')
+    .setDescription('Start a gather order — add as many items as you need using the "Add item" button')
+    .addUserOption((o) =>
+      o.setName('assignee').setDescription('Who should collect?').setRequired(true)
+    )
     .addStringOption((o) =>
       o
         .setName('item')
-        .setDescription('Block or item to collect (type to search Minecraft items)')
-        .setRequired(true)
+        .setDescription('First item to collect (type to search Minecraft items)')
+        .setRequired(false)
         .setAutocomplete(true)
     )
-    .addUserOption((o) =>
-      o
-        .setName('assignee')
-        .setDescription('Who should collect? (only needed for the first item)')
-        .setRequired(false)
+    .addStringOption((o) =>
+      o.setName('quantity').setDescription('How many? e.g. 64, 2 stacks, a shulker box').setRequired(false)
     )
     .addStringOption((o) =>
-      o
-        .setName('quantity')
-        .setDescription('How many? e.g. 64, 2 stacks, a shulker box')
-        .setRequired(false)
-    )
-    .addStringOption((o) =>
-      o
-        .setName('title')
-        .setDescription('Gather order title (optional — only used when starting a new order)')
-        .setRequired(false)
+      o.setName('title').setDescription('Gather order title').setRequired(false)
     ),
 
   async execute(interaction) {
@@ -60,61 +50,27 @@ module.exports = {
 
     await interaction.deferReply({ ephemeral: true });
 
-    const itemName = interaction.options.getString('item', true).trim();
-    const quantityRaw = (interaction.options.getString('quantity') ?? '').trim();
-    const label = quantityRaw ? `${quantityRaw}\u00d7 ${itemName}` : itemName;
-
-    const assigneeOption = interaction.options.getUser('assignee');
-    const titleOption = (interaction.options.getString('title') ?? '').trim();
-
-    let draft = gatherDraft.get(interaction.user.id);
-
-    if (!draft) {
-      if (!assigneeOption) {
-        return interaction.editReply({
-          content: 'Pick an **@assignee** — required when starting a new gather list.',
-        });
-      }
-      const member = await interaction.guild.members.fetch(assigneeOption.id).catch(() => null);
-      if (!member) {
-        return interaction.editReply({
-          content: "That user isn\u2019t in this server. Pick someone else.",
-        });
-      }
-      gatherDraft.touch(interaction.user.id, {
-        assigneeId: assigneeOption.id,
-        items: [label],
-        title: titleOption || 'Gather Order',
-      });
-    } else {
-      if (assigneeOption && String(assigneeOption.id) !== String(draft.assigneeId)) {
-        return interaction.editReply({
-          content: `You already have an active draft for <@${draft.assigneeId}>. Post it or let it expire first.`,
-        });
-      }
-      gatherDraft.addItem(interaction.user.id, label);
+    const assigneeUser = interaction.options.getUser('assignee', true);
+    const member = await interaction.guild.members.fetch(assigneeUser.id).catch(() => null);
+    if (!member) {
+      return interaction.editReply({ content: "That user isn\u2019t in this server. Pick someone else." });
     }
 
-    draft = gatherDraft.get(interaction.user.id);
-    const itemLines = draft.items.map((it, i) => `${i + 1}. ${it}`).join('\n');
+    const itemName = (interaction.options.getString('item') ?? '').trim();
+    const quantityRaw = (interaction.options.getString('quantity') ?? '').trim();
+    const titleOption = (interaction.options.getString('title') ?? '').trim();
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(GATHER.POST)
-        .setLabel('Post gather card')
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId(GATHER.CANCEL)
-        .setLabel('Cancel')
-        .setStyle(ButtonStyle.Secondary)
-    );
+    const items = itemName ? [quantityRaw ? `${quantityRaw}\u00d7 ${itemName}` : itemName] : [];
 
-    return interaction.editReply({
-      content:
-        `**Gather list for <@${draft.assigneeId}>** — *${draft.title}*\n${itemLines}\n\n` +
-        `*Run \`/assign-gather item:...\` again to add more items, then post when ready.*`,
-      components: [row],
+    gatherDraft.touch(interaction.user.id, {
+      assigneeId: assigneeUser.id,
+      items,
+      title: titleOption || 'Gather Order',
     });
+    gatherDraft.setInteraction(interaction.user.id, interaction);
+
+    const draft = gatherDraft.get(interaction.user.id);
+    return interaction.editReply(gatherDraft.buildMessage(draft));
   },
 
   /** @param {import('discord.js').AutocompleteInteraction} interaction */
@@ -123,8 +79,6 @@ module.exports = {
     const filtered = query
       ? MINECRAFT_ITEMS.filter((i) => i.toLowerCase().includes(query))
       : MINECRAFT_ITEMS.slice(0, 25);
-    return interaction.respond(
-      filtered.slice(0, 25).map((i) => ({ name: i, value: i }))
-    );
+    return interaction.respond(filtered.slice(0, 25).map((i) => ({ name: i, value: i })));
   },
 };

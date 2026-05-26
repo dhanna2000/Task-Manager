@@ -189,6 +189,29 @@ function buildGatherModalSlash() {
   return modal;
 }
 
+function buildAddItemModal() {
+  const modal = new ModalBuilder().setCustomId(MODAL.GATHER_ADD_ITEM).setTitle('Add item to gather');
+  const itemInput = new TextInputBuilder()
+    .setCustomId(FIELDS.GATHER_ITEM)
+    .setLabel('Item name')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(100)
+    .setPlaceholder('e.g. Oak Wood');
+  const qtyInput = new TextInputBuilder()
+    .setCustomId(FIELDS.GATHER_QTY)
+    .setLabel('Quantity (optional)')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(false)
+    .setMaxLength(50)
+    .setPlaceholder('e.g. 64, 2 stacks, a shulker box');
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(itemInput),
+    new ActionRowBuilder().addComponents(qtyInput),
+  );
+  return modal;
+}
+
 function showEditCategoriesModal(interaction) {
   const guildId = interaction.guild.id;
   const names = db.getCategories(guildId);
@@ -380,6 +403,28 @@ async function handleModalSubmit(interaction) {
     return true;
   }
 
+  if (interaction.customId === MODAL.GATHER_ADD_ITEM) {
+    const draft = gatherDraft.get(interaction.user.id);
+    if (!draft) {
+      await interaction.reply({
+        content: 'That gather draft expired. Run **`/assign-gather`** again.',
+        ephemeral: true,
+      });
+      return true;
+    }
+    const itemName = interaction.fields.getTextInputValue(FIELDS.GATHER_ITEM).trim();
+    const qty = (interaction.fields.getTextInputValue(FIELDS.GATHER_QTY) ?? '').trim();
+    const label = qty ? `${qty}\u00d7 ${itemName}` : itemName;
+    gatherDraft.addItem(interaction.user.id, label);
+    const updated = gatherDraft.get(interaction.user.id);
+    // Update the original gather card in place via the stored interaction webhook
+    await draft.interaction.editReply(gatherDraft.buildMessage(updated));
+    // Silently acknowledge the modal so nothing new appears for the user
+    await interaction.deferReply({ ephemeral: true });
+    await interaction.deleteReply();
+    return true;
+  }
+
   if (interaction.customId === MODAL.GATHER_SLASH) {
     if (!(await assertItemCollectionChannel(interaction))) return true;
     const draft = gatherDraft.take(interaction.user.id);
@@ -555,6 +600,7 @@ module.exports = {
   buildCreateQuestModalSlash,
   buildCreateQuestModalSlashOther,
   buildGatherModalSlash,
+  buildAddItemModal,
   showEditCategoriesModal,
   handleModalSubmit,
   postQuest,
