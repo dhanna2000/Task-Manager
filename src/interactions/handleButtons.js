@@ -1,10 +1,11 @@
 const { PermissionFlagsBits } = require('discord.js');
 const db = require('../storage/database');
-const { BOARD, parseQuestButton, parseQuestSubtaskButton } = require('../utils/ids');
+const { GATHER, BOARD, parseQuestButton, parseQuestSubtaskButton } = require('../utils/ids');
 const { getSubtasks, allSubtasksDone } = require('../utils/subtasks');
-const { showEditCategoriesModal, buildCreateQuestModal } = require('./handleModals');
+const { showEditCategoriesModal, buildCreateQuestModal, postQuest } = require('./handleModals');
 const { STATUS, buildQuestEmbed, questComponents } = require('../utils/embeds');
 const { buildStatusSnapshotEmbed } = require('../utils/statusSnapshot');
+const gatherDraft = require('./gatherDraft');
 
 function sameMessageId(a, b) {
   if (a == null || b == null) return false;
@@ -41,6 +42,30 @@ async function syncQuestCard(interaction, quest) {
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function handleButton(interaction) {
+  if (interaction.customId === GATHER.POST) {
+    const draft = gatherDraft.take(interaction.user.id);
+    if (!draft) {
+      return interaction.reply({
+        content: 'That gather draft expired (15 min limit). Run `/assign-gather` again.',
+        ephemeral: true,
+      });
+    }
+    const subtasks = draft.items.map((label) => ({ label, done: false }));
+    return postQuest(interaction, {
+      title: draft.title || 'Gather Order',
+      description: '',
+      category: 'Gather',
+      assigneeId: draft.assigneeId,
+      subtasks,
+      kind: 'gather',
+    });
+  }
+
+  if (interaction.customId === GATHER.CANCEL) {
+    gatherDraft.remove(interaction.user.id);
+    return interaction.reply({ content: 'Gather draft cancelled.', ephemeral: true });
+  }
+
   if (interaction.customId === BOARD.CREATE_BUTTON) {
     if (!interaction.guild || !interaction.channel) {
       return interaction.reply({

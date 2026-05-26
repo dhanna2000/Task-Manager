@@ -557,4 +557,5 @@ module.exports = {
   buildGatherModalSlash,
   showEditCategoriesModal,
   handleModalSubmit,
+  postQuest,
 };

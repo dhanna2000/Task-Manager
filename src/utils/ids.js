@@ -3,6 +3,11 @@
  * Keep under Discord's 100-char limit.
  */
 
+const GATHER = {
+  POST: 'gather:post',
+  CANCEL: 'gather:cancel',
+};
+
 const BOARD = {
   CREATE_BUTTON: 'questBoard:create',
   STATUS_BUTTON: 'questBoard:status',
@@ -54,6 +59,7 @@ function parseQuestSubtaskButton(customId) {
 }
 
 module.exports = {
+  GATHER,
   BOARD,
   MODAL,
   FIELDS,

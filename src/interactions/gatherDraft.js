@@ -1,10 +1,12 @@
 /**
- * Carries slash-chosen assignee into the follow-up gather modal submit.
+ * Carries slash-chosen assignee + accumulated items into the "Post gather card" button.
  */
 
 const TTL_MS = 15 * 60 * 1000;
 
-/** @type {Map<string, { assigneeId: string, expiresAt: number }>} */
+/**
+ * @type {Map<string, { assigneeId: string, items: string[], title: string, expiresAt: number }>}
+ */
 const drafts = new Map();
 
 function touch(userId, data) {
@@ -30,4 +32,18 @@ function take(userId) {
   return row;
 }
 
-module.exports = { touch, get, take };
+function addItem(userId, label) {
+  const row = get(userId);
+  if (!row) return false;
+  if (!Array.isArray(row.items)) row.items = [];
+  row.items.push(label);
+  row.expiresAt = Date.now() + TTL_MS;
+  drafts.set(userId, row);
+  return true;
+}
+
+function remove(userId) {
+  drafts.delete(userId);
+}
+
+module.exports = { touch, get, take, addItem, remove };
