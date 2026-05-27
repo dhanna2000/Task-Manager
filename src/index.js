@@ -40,8 +40,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isAutocomplete()) {
       if (interaction.commandName === createQuest.data.name) {
         await createQuest.autocomplete(interaction);
-      } else if (interaction.commandName === assignGather.data.name) {
-        await assignGather.autocomplete(interaction);
       }
       return;
     }
