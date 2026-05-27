@@ -63,6 +63,13 @@ function setPendingQty(userId, qty) {
   drafts.set(userId, row);
 }
 
+function setPendingItems(userId, items) {
+  const row = get(userId);
+  if (!row) return;
+  row.pendingItems = Array.isArray(items) ? items : [];
+  drafts.set(userId, row);
+}
+
 function buildMessage(draft) {
   const itemLines = draft.items.length
     ? draft.items.map((it, i) => `${i + 1}. ${it}`).join('\n')
@@ -79,4 +86,4 @@ function buildMessage(draft) {
   return { content, components: [row] };
 }
 
-module.exports = { touch, get, take, addItem, remove, setInteraction, setPendingQty, buildMessage };
+module.exports = { touch, get, take, addItem, remove, setInteraction, setPendingQty, setPendingItems, buildMessage };

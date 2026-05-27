@@ -26,6 +26,8 @@ const MODAL = {
   GATHER_SLASH: 'questModal:gatherSlash',
   /** "Search & Add Items" button on the gather draft card */
   GATHER_SEARCH: 'questModal:gatherSearch',
+  /** Qty input shown after selecting items from the search dropdown */
+  GATHER_QTY_MODAL: 'questModal:gatherQty',
   EDIT_CATEGORIES: 'questModal:editCategories',
 };
 
