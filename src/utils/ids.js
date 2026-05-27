@@ -7,6 +7,7 @@ const GATHER = {
   POST: 'gather:post',
   CANCEL: 'gather:cancel',
   ADD_ITEM: 'gather:addItem',
+  SEARCH_SELECT: 'gather:searchSelect',
 };
 
 const BOARD = {
@@ -23,8 +24,8 @@ const MODAL = {
   CREATE_SLASH_OTHER: 'questModal:createSlashOther',
   /** After `/assign-gather` — assignee chosen, list items in modal */
   GATHER_SLASH: 'questModal:gatherSlash',
-  /** "Add item" button on the gather draft card */
-  GATHER_ADD_ITEM: 'questModal:gatherAddItem',
+  /** "Search & Add Items" button on the gather draft card */
+  GATHER_SEARCH: 'questModal:gatherSearch',
   EDIT_CATEGORIES: 'questModal:editCategories',
 };
 
@@ -41,8 +42,8 @@ const FIELDS = {
   CATEGORY_CUSTOM: 'q_cat_custom',
   /** One line per sub-task / todo */
   SUBTASKS: 'q_subtasks',
-  /** Gather add-item modal fields */
-  GATHER_ITEM: 'gather_item',
+  /** Gather search modal fields */
+  GATHER_SEARCH_QUERY: 'gather_search_query',
   GATHER_QTY: 'gather_qty',
 };
 

@@ -14,6 +14,7 @@ const setupItemCollection = require('./commands/setup-item-collection');
 const questLookup = require('./commands/quest');
 const { handleButton } = require('./interactions/handleButtons');
 const { handleModalSubmit } = require('./interactions/handleModals');
+const { handleSelect } = require('./interactions/handleSelects');
 
 const token = process.env.DISCORD_TOKEN;
 
@@ -72,6 +73,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.isModalSubmit()) {
       await handleModalSubmit(interaction);
+    }
+
+    if (interaction.isStringSelectMenu()) {
+      await handleSelect(interaction);
     }
   } catch (err) {
     console.error(err);

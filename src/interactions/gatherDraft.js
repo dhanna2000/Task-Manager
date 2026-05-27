@@ -56,20 +56,27 @@ function setInteraction(userId, interaction) {
   drafts.set(userId, row);
 }
 
+function setPendingQty(userId, qty) {
+  const row = get(userId);
+  if (!row) return;
+  row.pendingQty = qty || '';
+  drafts.set(userId, row);
+}
+
 function buildMessage(draft) {
   const itemLines = draft.items.length
     ? draft.items.map((it, i) => `${i + 1}. ${it}`).join('\n')
-    : '*No items yet — click "Add item" below.*';
+    : '*No items yet — click "Search & Add Items" below.*';
   const content =
     `**Gather list for <@${draft.assigneeId}>** — *${draft.title}*\n` +
     `${itemLines}\n\n` +
-    `*Click **Add item** to add more, then post when ready.*`;
+    `*Click **Search & Add Items** to search and multi-select, then post when ready.*`;
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(GATHER.ADD_ITEM).setLabel('Add item').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(GATHER.ADD_ITEM).setLabel('Search & Add Items').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(GATHER.POST).setLabel('Post gather card').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(GATHER.CANCEL).setLabel('Cancel').setStyle(ButtonStyle.Secondary),
   );
   return { content, components: [row] };
 }
 
-module.exports = { touch, get, take, addItem, remove, setInteraction, buildMessage };
+module.exports = { touch, get, take, addItem, remove, setInteraction, setPendingQty, buildMessage };

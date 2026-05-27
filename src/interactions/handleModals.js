@@ -3,9 +3,12 @@ const {
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
 } = require('discord.js');
 const db = require('../storage/database');
-const { MODAL, FIELDS } = require('../utils/ids');
+const { MODAL, FIELDS, GATHER } = require('../utils/ids');
+const MINECRAFT_ITEMS = require('../data/minecraft-items');
 const { parseDiscordUserId } = require('../utils/parseAssignee');
 const questDraft = require('./questDraft');
 const gatherDraft = require('./gatherDraft');
@@ -189,24 +192,24 @@ function buildGatherModalSlash() {
   return modal;
 }
 
-function buildAddItemModal() {
-  const modal = new ModalBuilder().setCustomId(MODAL.GATHER_ADD_ITEM).setTitle('Add item to gather');
-  const itemInput = new TextInputBuilder()
-    .setCustomId(FIELDS.GATHER_ITEM)
-    .setLabel('Item name')
+function buildSearchModal() {
+  const modal = new ModalBuilder().setCustomId(MODAL.GATHER_SEARCH).setTitle('Search items to add');
+  const searchInput = new TextInputBuilder()
+    .setCustomId(FIELDS.GATHER_SEARCH_QUERY)
+    .setLabel('Search (e.g. "oak", "brass", "stone")')
     .setStyle(TextInputStyle.Short)
     .setRequired(true)
     .setMaxLength(100)
-    .setPlaceholder('e.g. Oak Wood');
+    .setPlaceholder('Type part of an item name');
   const qtyInput = new TextInputBuilder()
     .setCustomId(FIELDS.GATHER_QTY)
-    .setLabel('Quantity (optional)')
+    .setLabel('Quantity (optional — applies to all selected)')
     .setStyle(TextInputStyle.Short)
     .setRequired(false)
     .setMaxLength(50)
     .setPlaceholder('e.g. 64, 2 stacks, a shulker box');
   modal.addComponents(
-    new ActionRowBuilder().addComponents(itemInput),
+    new ActionRowBuilder().addComponents(searchInput),
     new ActionRowBuilder().addComponents(qtyInput),
   );
   return modal;
@@ -403,7 +406,7 @@ async function handleModalSubmit(interaction) {
     return true;
   }
 
-  if (interaction.customId === MODAL.GATHER_ADD_ITEM) {
+  if (interaction.customId === MODAL.GATHER_SEARCH) {
     const draft = gatherDraft.get(interaction.user.id);
     if (!draft) {
       await interaction.reply({
@@ -412,16 +415,39 @@ async function handleModalSubmit(interaction) {
       });
       return true;
     }
-    const itemName = interaction.fields.getTextInputValue(FIELDS.GATHER_ITEM).trim();
+    const query = interaction.fields.getTextInputValue(FIELDS.GATHER_SEARCH_QUERY).trim();
     const qty = (interaction.fields.getTextInputValue(FIELDS.GATHER_QTY) ?? '').trim();
-    const label = qty ? `${qty}\u00d7 ${itemName}` : itemName;
-    gatherDraft.addItem(interaction.user.id, label);
-    const updated = gatherDraft.get(interaction.user.id);
-    // Update the original gather card in place via the stored interaction webhook
-    await draft.interaction.editReply(gatherDraft.buildMessage(updated));
-    // Silently acknowledge the modal so nothing new appears for the user
-    await interaction.deferReply({ ephemeral: true });
-    await interaction.deleteReply();
+
+    const results = MINECRAFT_ITEMS.filter((i) => i.toLowerCase().includes(query.toLowerCase()));
+    if (results.length === 0) {
+      await interaction.reply({
+        content: `No items found matching **"${query}"**. Try a shorter or different search term.`,
+        ephemeral: true,
+      });
+      return true;
+    }
+
+    gatherDraft.setPendingQty(interaction.user.id, qty);
+
+    const options = results.slice(0, 25).map((name) => {
+      const safe = name.length > 100 ? name.slice(0, 97) + '\u2026' : name;
+      return new StringSelectMenuOptionBuilder().setLabel(safe).setValue(safe);
+    });
+
+    const select = new StringSelectMenuBuilder()
+      .setCustomId(GATHER.SEARCH_SELECT)
+      .setPlaceholder(`Pick items to add${qty ? ` (qty: ${qty} each)` : ''}`)
+      .setMinValues(1)
+      .setMaxValues(options.length)
+      .addOptions(options);
+
+    const qtyNote = qty ? ` — quantity **${qty}** will apply to each` : '';
+    const countNote = results.length > 25 ? ` (showing top 25 of ${results.length})` : '';
+    await interaction.reply({
+      content: `**Results for "${query}"**${countNote}${qtyNote}:`,
+      components: [new ActionRowBuilder().addComponents(select)],
+      ephemeral: true,
+    });
     return true;
   }
 
@@ -600,7 +626,7 @@ module.exports = {
   buildCreateQuestModalSlash,
   buildCreateQuestModalSlashOther,
   buildGatherModalSlash,
-  buildAddItemModal,
+  buildSearchModal,
   showEditCategoriesModal,
   handleModalSubmit,
   postQuest,

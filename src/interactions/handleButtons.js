@@ -2,7 +2,7 @@ const { PermissionFlagsBits } = require('discord.js');
 const db = require('../storage/database');
 const { GATHER, BOARD, parseQuestButton, parseQuestSubtaskButton } = require('../utils/ids');
 const { getSubtasks, allSubtasksDone } = require('../utils/subtasks');
-const { showEditCategoriesModal, buildCreateQuestModal, buildAddItemModal, postQuest } = require('./handleModals');
+const { showEditCategoriesModal, buildCreateQuestModal, buildSearchModal, postQuest } = require('./handleModals');
 const { STATUS, buildQuestEmbed, questComponents } = require('../utils/embeds');
 const { buildStatusSnapshotEmbed } = require('../utils/statusSnapshot');
 const gatherDraft = require('./gatherDraft');
@@ -69,7 +69,7 @@ async function handleButton(interaction) {
         ephemeral: true,
       });
     }
-    return interaction.showModal(buildAddItemModal());
+    return interaction.showModal(buildSearchModal());
   }
 
   if (interaction.customId === GATHER.CANCEL) {
