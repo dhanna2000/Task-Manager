@@ -6,7 +6,7 @@ const { renderAllQuestsPngs } = require('../utils/questTableImage');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('list-quests')
-    .setDescription('Show every quest in this server in a table (all assignees, all statuses).'),
+    .setDescription('Show all active (non-completed) quests. Use /list-archived for completed ones.'),
 
   async execute(interaction) {
     if (!interaction.guild) {
@@ -19,7 +19,7 @@ module.exports = {
     /** Public reply so everyone in the channel can see the quest table */
     await interaction.deferReply();
 
-    const quests = db.getGuildQuests(interaction.guild.id);
+    const quests = db.getGuildQuests(interaction.guild.id).filter((q) => q.status !== 'completed');
 
     try {
       const { buffers, empty } = await renderAllQuestsPngs(interaction.guild, quests);
