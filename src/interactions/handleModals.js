@@ -420,8 +420,21 @@ async function handleModalSubmit(interaction) {
     }
     const query = interaction.fields.getTextInputValue(FIELDS.GATHER_SEARCH_QUERY).trim();
 
-    const results = MINECRAFT_ITEMS.filter((i) => i.toLowerCase().includes(query.toLowerCase()));
-    if (results.length === 0) {
+    const q = query.toLowerCase();
+    const scored = MINECRAFT_ITEMS
+      .filter((i) => i.toLowerCase().includes(q))
+      .map((name) => {
+        const lower = name.toLowerCase();
+        let score;
+        if (lower === q) score = 0;
+        else if (lower.startsWith(q)) score = 1;
+        else if (lower.split(' ').some((w) => w.startsWith(q))) score = 2;
+        else score = 3;
+        return { name, score };
+      })
+      .sort((a, b) => a.score - b.score || a.name.length - b.name.length);
+
+    if (scored.length === 0) {
       await interaction.reply({
         content: `No items found matching **"${query}"**. Try a shorter or different search term.`,
         ephemeral: true,
@@ -429,7 +442,7 @@ async function handleModalSubmit(interaction) {
       return true;
     }
 
-    const options = results.slice(0, 25).map((name) => {
+    const options = scored.slice(0, 25).map(({ name }) => {
       const safe = name.length > 100 ? name.slice(0, 97) + '\u2026' : name;
       return new StringSelectMenuOptionBuilder().setLabel(safe).setValue(safe);
     });
@@ -441,7 +454,7 @@ async function handleModalSubmit(interaction) {
       .setMaxValues(options.length)
       .addOptions(options);
 
-    const countNote = results.length > 25 ? ` (showing top 25 of ${results.length})` : '';
+    const countNote = scored.length > 25 ? ` (showing top 25 of ${scored.length})` : '';
     await interaction.reply({
       content: `**Results for "${query}"**${countNote}:`,
       components: [new ActionRowBuilder().addComponents(select)],
